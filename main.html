@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 의학통번역 서비스 Pilot Site</title>
+    <meta name="description" content="실시간 AI STT 성능 확인 및 의료 상담 파일럿 서비스를 제공하는 의학 통번역 플랫폼입니다.">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --primary-light: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --text: #334155;
+            --text-muted: #64748b;
+            --card-bg: #ffffff;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            letter-spacing: -0.025em;
+        }
+
+        p.subtitle {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 640px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2.5rem 2rem;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent);
+        }
+
+        .card-icon {
+            width: 64px;
+            height: 64px;
+            background: #eff6ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .card p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .btn {
+            margin-top: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--accent);
+            color: white;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+        .card:hover .btn {
+            background-color: var(--accent-hover);
+        }
+
+        footer {
+            margin-top: 5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* SVG Icons colors */
+        .icon {
+            fill: currentColor;
+        }
+
+        /* Modal Styles */
+        #api-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: var(--shadow-lg);
+            text-align: left;
+        }
+        .modal-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 0.8rem;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>실시간 의학통번역 서비스 Pilot Site</h1>
+            <p class="subtitle">AI 기술과 의료 전문성을 결합한 혁신적인 통번역 솔루션의 파일럿 테스트 페이지입니다.</p>
+        </header>
+
+        <main class="grid">
+            <a href="test_cut.html" class="card" id="stt-link">
+                <div class="card-icon">
+                    <svg class="icon" viewBox="0 0 24 24" width="32" height="32">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                        <path
+                            d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                    </svg>
+                </div>
+                <h2>실시간 AI STT 성능확인</h2>
+                <p>실시간 음성을 텍스트로 변환하는 AI 모델의 성능을 직접 테스트해보세요.</p>
+                <div class="btn">테스트 시작</div>
+            </a>
+
+            <a href="pliot.html" class="card" id="pilot-link">
+                <div class="card-icon">
+                    <svg class="icon" viewBox="0 0 24 24" width="32" height="32">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                    </svg>
+                </div>
+                <h2>의료 상담 Pilot</h2>
+                <p>AI 통번역을 기반으로 한 전문적인 의료 상담 서비스를 경험해보세요.</p>
+                <div class="btn">상담 접속</div>
+            </a>
+        </main>
+
+        <footer>
+            <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--primary);">Swift Medical Clinic</div>
+            <div style="margin-bottom: 0.25rem;">Unit 105, 7136 11 St NE, Calgary, AB</div>
+            <div style="margin-bottom: 1rem;">info@swiftmedicalclinic.com </div>
+            <div style="margin-bottom: 1rem;">
+                <button onclick="resetApiKey()" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.8rem;">API Key 재설정</button>
+            </div>
+            &copy; 2026 Swift Medical Clinic. All rights reserved.
+        </footer>
+    </div>
+
+    <!-- API Key Modal -->
+    <div id="api-modal">
+        <div class="modal-content">
+            <h3>🔑 API Key 설정</h3>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">서비스 이용을 위해 OpenAI API Key를 입력해주세요. 입력하신 키는 브라우저에 안전하게 저장됩니다.</p>
+            <input type="password" id="api-key-input" placeholder="sk-...">
+            <button onclick="saveApiKey()" class="btn" style="width: 100%; margin-top: 0.5rem; padding: 1rem;">저장 및 시작하기</button>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('openai_api_key');
+            if (!savedKey) {
+                document.getElementById('api-modal').style.display = 'flex';
+            }
+        });
+
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if (key.startsWith('sk-')) {
+                localStorage.setItem('openai_api_key', key);
+                document.getElementById('api-modal').style.display = 'none';
+            } else {
+                alert('올바른 OpenAI API Key (sk-로 시작)를 입력해주세요.');
+            }
+        }
+
+        function resetApiKey() {
+            localStorage.removeItem('openai_api_key');
+            location.reload();
+        }
+    </script>
+
+</body>
+
+</html>

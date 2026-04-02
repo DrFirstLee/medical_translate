@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 AI STT 성능확인 - Pliot Site</title>
+    <!-- Google Fonts: Inter & Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --secondary: #2563eb;
+            --accent: #38bdf8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .header-nav {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 2rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .back-link:hover {
+            color: var(--secondary);
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 800px;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .input-group {
+            margin-bottom: 2rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        #apiKey {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            transition: var(--transition);
+            background: #fbfcfe;
+        }
+
+        #apiKey:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        button {
+            padding: 0.875rem 1.75rem;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        #startBtn {
+            background-color: var(--secondary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+
+        #startBtn:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        #startBtn.active {
+            background-color: #ef4444;
+        }
+
+        .vol-meter-container {
+            flex-grow: 1;
+            height: 12px;
+            background: #f1f5f9;
+            border-radius: 100px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid var(--border);
+        }
+
+        #vol-meter {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            transition: width 0.1s;
+        }
+
+        .threshold-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: rgba(239, 68, 68, 0.5);
+            left: 35%;
+        }
+
+        #status {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #cbd5e1;
+            border-radius: 50%;
+        }
+
+        .status-dot.active {
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* 텍스트 영역 스타일 */
+        #transcript-area {
+            width: 100%;
+            height: 450px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            background: #fbfcfe;
+            overflow-y: auto;
+            text-align: left;
+            line-height: 1.7;
+            font-size: 1.1rem;
+            color: var(--text-main);
+        }
+
+        .text-block {
+            margin-bottom: 1.25rem;
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            animation: fadeInBlock 0.4s ease-out;
+        }
+
+        @keyframes fadeInBlock {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 스크롤바 커스텀 */
+        #transcript-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #transcript-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #transcript-area::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="header-nav">
+        <a href="main.html" class="back-link">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m15 18-6-6 6-6" />
+            </svg>
+            홈으로 돌아가기
+        </a>
+    </nav>
+
+    <div class="main-container">
+        <div class="card">
+            <h1>🎙️ 실시간 AI STT 성능확인</h1>
+
+            <!-- 설정 영역 삭제됨 (Cleaner UI) -->
+
+            <div class="controls">
+                <button id="startBtn">모니터링 시작</button>
+                <div class="vol-meter-container">
+                    <div id="vol-meter"></div>
+                    <div class="threshold-line"></div>
+                </div>
+            </div>
+
+            <div id="status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">상태: 대기 중</span>
+            </div>
+
+            <div id="transcript-area">
+                <div style="color: #94a3b8; text-align: center; margin-top: 150px;">
+                    음성 인식이 시작되면 여기에 텍스트가 표시됩니다.
+                </div>
+            </div>
+            <footer
+                style="margin-top: 5rem; text-align: center; color: var(--text-muted); font-size: 0.875rem; padding: 2rem;">
+                <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--primary);">Swift Medical Clinic</div>
+                <div style="margin-bottom: 0.25rem;">Unit 105, 7136 11 St NE, Calgary, AB</div>
+                <div style="margin-top: 0.25rem;">info@swiftmedicalclinic.com </div>
+                <div style="margin-top: 1rem;">&copy; 2026 Swift Medical Clinic. All rights reserved.</div>
+            </footer>
+        </div>
+
+        <script>
+        const OPENAI_API_KEY = localStorage.getItem('openai_api_key');
+        if (!OPENAI_API_KEY) {
+            alert("API Key가 설정되어 있지 않습니다. 홈 페이지에서 먼저 설정해주세요.");
+            location.href = "main.html";
+        }
+
+            let currentStream;
+            let audioContext, analyser, microphone, scriptProcessor;
+            let mediaRecorder;
+            let audioChunks = [];
+            let isMonitoring = false;
+
+            const THRESHOLD = 35;
+            let SILENCE_DURATION = 2000;
+
+            let isSpeaking = false;
+            let silenceTimer = null;
+
+            const startBtn = document.getElementById('startBtn');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const transcriptArea = document.getElementById('transcript-area');
+        const volMeter = document.getElementById('vol-meter');
+
+            startBtn.onclick = async () => {
+                if (isMonitoring) {
+                stopMonitoring();
+                return;
+            }
+            // SILENCE_DURATION = 2000;
+
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    initAudio(currentStream);
+                    isMonitoring = true;
+                    startBtn.innerText = "모니터링 중지";
+                    startBtn.classList.add('active');
+                    statusText.innerText = "상태: 음성 대기 중...";
+                    statusDot.classList.add('active');
+                } catch (err) {
+                    alert("마이크 권한이 필요합니다.");
+                }
+            };
+
+            function stopMonitoring() {
+                isMonitoring = false;
+                startBtn.innerText = "모니터링 시작";
+                startBtn.classList.remove('active');
+                statusText.innerText = "상태: 중지됨";
+                statusDot.classList.remove('active');
+                volMeter.style.width = "0%";
+
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                if (audioContext) {
+                    audioContext.close();
+                }
+            }
+
+            function initAudio(stream) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+
+                analyser.fftSize = 256;
+                microphone.connect(analyser);
+                analyser.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination);
+
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioChunks = [];
+                    if (blob.size > 2000) {
+                        await requestSTT(blob);
+                    }
+                };
+
+                scriptProcessor.onaudioprocess = () => {
+                    const array = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(array);
+                    let sum = 0;
+                    for (let i = 0; i < array.length; i++) sum += array[i];
+                    const average = sum / array.length;
+
+                    volMeter.style.width = Math.min(average * 2, 100) + "%";
+
+                    if (average > THRESHOLD) {
+                        if (!isSpeaking) {
+                            isSpeaking = true;
+                            statusText.innerText = "상태: 녹음 중...";
+                            if (mediaRecorder.state === "inactive") mediaRecorder.start();
+                        }
+                        clearTimeout(silenceTimer);
+                        silenceTimer = null;
+                    } else {
+                        if (isSpeaking && !silenceTimer) {
+                            silenceTimer = setTimeout(() => {
+                                isSpeaking = false;
+                                statusText.innerText = `상태: ${SILENCE_DURATION / 1000}초 정적 감지 (전송 중)`;
+                                if (mediaRecorder.state === "recording") mediaRecorder.stop();
+                            }, SILENCE_DURATION);
+                        }
+                    }
+                };
+            }
+
+            async function requestSTT(blob) {
+                const formData = new FormData();
+                formData.append('file', blob, 'speech.webm');
+                formData.append('model', 'whisper-1');
+                // formData.append('language', 'ko');
+
+                try {
+                    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                    body: formData
+                });
+
+                    const data = await response.json();
+                    console.log("Whisper STT Response:", data);
+                    if (data.text && data.text.trim()) {
+                        const div = document.createElement('div');
+                        div.className = 'text-block';
+                        div.innerText = data.text;
+                        transcriptArea.appendChild(div);
+                        transcriptArea.scrollTop = transcriptArea.scrollHeight;
+                    }
+                    statusText.innerText = "상태: 다시 대기 중...";
+                } catch (err) {
+                    statusText.innerText = "상태: API 오류 발생";
+                }
+            }
+        </script>
+
+</body>
+
+</html>
