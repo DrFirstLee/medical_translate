@@ -389,7 +389,7 @@
             alert("API Key가 설정되어 있지 않습니다. 홈 페이지에서 먼저 설정해주세요.");
             location.href = "index.html";
         }
-        const LLM_MODEL = "gpt-5-nano-2025-08-07";
+        const LLM_MODEL = "gpt-4.1-nano-2025-04-14"; // "gpt-5-nano-2025-08-07";
 
         let currentStream;
         let audioContext, analyser, microphone, scriptProcessor;
@@ -560,39 +560,56 @@
             const patL = patientLang.value === "other" ? patientLangOther.value : patientLang.value;
 
             try {
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                // 1) 발화 정보 판단 (의사/환자 파싱)
+                const roleTask = fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENAI_API_KEY}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
                     body: JSON.stringify({
                         model: LLM_MODEL,
                         messages: [
                             {
                                 role: "system",
-                                content: `You are a professional medical translator. 
-                                IMPORTANT: This is a REAL-TIME translation. Respond as FAST and concisely as possible.
-                                Follow these steps:
-                                1. Detect the language of the input text.
-                                2. Identify the speaker:
-                                   - Doctor speaks ${docL}
-                                   - Patient speaks ${patL}
-                                3. Based on the detected language, determine if the role is "Doctor" or "Patient".
-                                4. Translate the text into the OTHER participant's language with medical precision.
-                                Respond ONLY in JSON format: { "role": "Doctor" or "Patient", "translation": "..." }`
+                                content: `Identify the speaker. Input is one sentence. 
+                                Doctor speaks ${docL}, Patient speaks ${patL}. 
+                                Determine who is speaking based on language or context.
+                                Respond JSON: {"role": "Doctor" or "Patient"}`
                             },
                             { role: "user", content: text }
                         ],
-                        response_format: { type: "json_object" },
+                        response_format: { type: "json_object" }
                     })
                 });
-                const data = await response.json();
-                console.log("GPT Chat Response (Raw):", data);
-                const json = JSON.parse(data.choices[0].message.content);
-                console.log("GPT Chat Response (Parsed):", json);
-                const role = json.role; // "Doctor" or "Patient"
-                const resultText = json.translation;
+
+                // 2) 언어 번역 (다른 상대방의 언어로)
+                const transTask = fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                    body: JSON.stringify({
+                        model: LLM_MODEL,
+                        messages: [
+                            {
+                                role: "system",
+                                content: `Medical machine translator. 
+                                Translate input text between ${docL} and ${patL} (to the target other person's language). 
+                                Respond JSON: {"translation": "..."}`
+                            },
+                            { role: "user", content: text }
+                        ],
+                        response_format: { type: "json_object" }
+                    })
+                });
+
+                const [roleReply, transReply] = await Promise.all([roleTask, transTask]);
+                const [roleData, transData] = await Promise.all([roleReply.json(), transReply.json()]);
+
+                console.log("GPT Role Response:", roleData);
+                console.log("GPT Trans Response:", transData);
+
+                const roleJson = JSON.parse(roleData.choices[0].message.content);
+                const transJson = JSON.parse(transData.choices[0].message.content);
+
+                const role = roleJson.role;
+                const resultText = transJson.translation;
 
                 // UI 업데이트: 카드 스타일 및 라벨링
                 const roleBadge = document.createElement('div');
