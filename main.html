@@ -169,13 +169,17 @@
         #api-modal {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(4px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
         }
+
         .modal-content {
             background: white;
             padding: 2.5rem;
@@ -185,11 +189,13 @@
             box-shadow: var(--shadow-lg);
             text-align: left;
         }
+
         .modal-content h3 {
             font-size: 1.5rem;
             margin-bottom: 1rem;
             color: var(--primary);
         }
+
         .modal-content input {
             width: 100%;
             padding: 0.8rem;
@@ -205,8 +211,12 @@
 
     <div class="container">
         <header>
+            <div style="margin-bottom: 1.5rem;">
+                <img src="logo-icon.webp" alt="Swift Medical Logo"
+                    style="width: 100px; height: auto; transition: transform 0.3s ease;">
+            </div>
             <h1>실시간 의학통번역 서비스 Pilot Site</h1>
-            <p class="subtitle">AI 기술과 의료 전문성을 결합한 혁신적인 통번역 솔루션의 파일럿 테스트 페이지입니다.</p>
+            <p class="subtitle">AI 기술을 활용, <br> 환자와 의사의 대화를 실시간 통번역 하기위한 파일럿 테스트 페이지입니다.</p>
         </header>
 
         <main class="grid">
@@ -241,7 +251,9 @@
             <div style="margin-bottom: 0.25rem;">Unit 105, 7136 11 St NE, Calgary, AB</div>
             <div style="margin-bottom: 1rem;">info@swiftmedicalclinic.com </div>
             <div style="margin-bottom: 1rem;">
-                <button onclick="resetApiKey()" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.8rem;">API Key 재설정</button>
+                <button onclick="resetApiKey()"
+                    style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.8rem;">API
+                    Key 재설정</button>
             </div>
             &copy; 2026 Swift Medical Clinic. All rights reserved.
         </footer>
@@ -251,9 +263,11 @@
     <div id="api-modal">
         <div class="modal-content">
             <h3>🔑 API Key 설정</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted);">서비스 이용을 위해 OpenAI API Key를 입력해주세요. 입력하신 키는 브라우저에 안전하게 저장됩니다.</p>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">서비스 이용을 위해 OpenAI API Key를 입력해주세요. 입력하신 키는 브라우저에
+                안전하게 저장됩니다.</p>
             <input type="password" id="api-key-input" placeholder="sk-...">
-            <button onclick="saveApiKey()" class="btn" style="width: 100%; margin-top: 0.5rem; padding: 1rem;">저장 및 시작하기</button>
+            <button onclick="saveApiKey()" class="btn" style="width: 100%; margin-top: 0.5rem; padding: 1rem;">저장 및
+                시작하기</button>
         </div>
     </div>
 

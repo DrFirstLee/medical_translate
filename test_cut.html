@@ -305,7 +305,22 @@
         <div class="card">
             <h1>🎙️ 실시간 AI STT 성능확인</h1>
 
-            <!-- 설정 영역 삭제됨 (Cleaner UI) -->
+            <!-- 실시간 성능 튜닝 영역 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; padding: 1.25rem; background: #f8fafc; border-radius: 1rem; border: 1px dashed var(--border);">
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label style="display: flex; justify-content: space-between;">
+                        <span>🔊 감지 임계값 (Threshold)</span>
+                        <span id="thresholdVal" style="color: var(--accent); font-weight: 700;">35</span>
+                    </label>
+                    <input type="range" id="thresholdInput" min="5" max="100" value="35" 
+                           style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 5px; outline: none; margin-top: 0.5rem;">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label>⏳ 정적 대기 시간 (초)</label>
+                    <input type="number" id="silenceInput" value="2.0" step="0.5" min="0.5" max="10" 
+                           style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); font-weight: 600; margin-top: 0.3rem;">
+                </div>
+            </div>
 
             <div class="controls">
                 <button id="startBtn">모니터링 시작</button>
@@ -358,13 +373,26 @@
         const statusDot = document.getElementById('status-dot');
         const transcriptArea = document.getElementById('transcript-area');
         const volMeter = document.getElementById('vol-meter');
+        const thresholdInput = document.getElementById('thresholdInput');
+        const thresholdVal = document.getElementById('thresholdVal');
+        const silenceInput = document.getElementById('silenceInput');
+        const thresholdLine = document.querySelector('.threshold-line');
 
-            startBtn.onclick = async () => {
-                if (isMonitoring) {
+        // 임계값 슬라이더 조절 시 실시간 라인 이동
+        thresholdInput.oninput = () => {
+            const val = thresholdInput.value;
+            thresholdVal.innerText = val;
+            thresholdLine.style.left = val + "%";
+        };
+
+        startBtn.onclick = async () => {
+            if (isMonitoring) {
                 stopMonitoring();
                 return;
             }
-            // SILENCE_DURATION = 2000;
+            
+            // 현재 입력된 설정값 적용
+            SILENCE_DURATION = parseFloat(silenceInput.value) * 1000;
 
                 try {
                     currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -424,8 +452,9 @@
                     const average = sum / array.length;
 
                     volMeter.style.width = Math.min(average * 2, 100) + "%";
+                    const currentThreshold = parseInt(thresholdInput.value);
 
-                    if (average > THRESHOLD) {
+                    if (average > currentThreshold) {
                         if (!isSpeaking) {
                             isSpeaking = true;
                             statusText.innerText = "상태: 녹음 중...";
