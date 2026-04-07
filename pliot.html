@@ -389,7 +389,7 @@
             alert("API Key가 설정되어 있지 않습니다. 홈 페이지에서 먼저 설정해주세요.");
             location.href = "index.html";
         }
-        const LLM_MODEL = "gpt-5-nano-2025-08-07"; //"gpt-4.1-nano-2025-04-14"; // "gpt-5-nano-2025-08-07";
+        const LLM_MODEL = "gpt-4.1-nano-2025-04-14"; //"gpt-5-nano-2025-08-07"; 
 
         let currentStream;
         let audioContext, analyser, microphone, scriptProcessor;
@@ -397,11 +397,12 @@
         let audioChunks = [];
         let isMonitoring = false;
 
-        const THRESHOLD = 35;
+        const THRESHOLD = 30; // 30으로 낮춰 작은 소리도 감지
         let SILENCE_DURATION = 2000;
 
         let isSpeaking = false;
         let silenceTimer = null;
+        let isCutting = false; // cutRecording 중복 호출 방지 플래그
 
         const startBtn = document.getElementById('startBtn');
         const statusText = document.getElementById('status-text');
@@ -424,7 +425,6 @@
                 stopMonitoring();
                 return;
             }
-            // SILENCE_DURATION = 2000; // 기본값 사용
 
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -456,6 +456,54 @@
             }
         }
 
+        let hasSpokenInThisChunk = false;
+        let lastResetTime = Date.now();
+
+        // ============================================================
+        // [핵심 수정] 이중 버퍼링 녹음 전환 함수
+        // 새 녹음기를 먼저 시작한 뒤 이전 녹음기를 중지하여
+        // 녹음 공백(gap)을 완전히 제거합니다.
+        // ============================================================
+        function cutRecording() {
+            if (isCutting) return; // 중복 호출 방지
+            if (!isMonitoring) return;
+            if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+
+            isCutting = true;
+
+            // 1) 이전 녹음기 참조와 데이터를 캡처
+            const oldRecorder = mediaRecorder;
+            const oldChunks = audioChunks;
+            const oldHadSpeech = hasSpokenInThisChunk;
+
+            // 2) 새 녹음기를 즉시 생성 & 시작 (공백 0ms)
+            audioChunks = [];
+            hasSpokenInThisChunk = false;
+            lastResetTime = Date.now();
+
+            mediaRecorder = new MediaRecorder(currentStream);
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            mediaRecorder.start();
+
+            // 3) 이전 녹음기의 마지막 데이터를 올바른 배열로 라우팅
+            oldRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) oldChunks.push(e.data);
+            };
+
+            // 4) 이전 녹음기 중지 → 완료 시 처리
+            oldRecorder.onstop = () => {
+                const blob = new Blob(oldChunks, { type: 'audio/webm' });
+                if (blob.size > 2000 && oldHadSpeech) {
+                    processDialogue(blob);
+                }
+                isCutting = false;
+            };
+
+            oldRecorder.stop();
+        }
+
         function initAudio(stream) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
@@ -467,15 +515,14 @@
             analyser.connect(scriptProcessor);
             scriptProcessor.connect(audioContext.destination);
 
+            // 최초 녹음기 설정 & 시작
             mediaRecorder = new MediaRecorder(stream);
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
-            mediaRecorder.onstop = async () => {
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                audioChunks = [];
-                if (blob.size > 2000) {
-                    await processDialogue(blob);
-                }
-            };
+            mediaRecorder.start();
+
+            SILENCE_DURATION = 1800; // 1.8초 정적 시 종료
+            const MAX_CHUNK_DURATION = 20000; // 20초 강제 분할
+            const IDLE_FLUSH_INTERVAL = 5000; // 대기 중 버퍼 비우기 주기 (5초)
 
             scriptProcessor.onaudioprocess = () => {
                 const array = new Uint8Array(analyser.frequencyBinCount);
@@ -486,21 +533,33 @@
 
                 volMeter.style.width = Math.min(average * 2, 100) + "%";
 
+                const currentTime = Date.now();
+                const chunkElapsed = currentTime - lastResetTime;
+
                 if (average > THRESHOLD) {
                     if (!isSpeaking) {
                         isSpeaking = true;
-                        statusText.innerText = "상태: 녹음 중...";
-                        if (mediaRecorder.state === "inactive") mediaRecorder.start();
+                        hasSpokenInThisChunk = true;
+                        statusText.innerText = "상태: 음성 감지 중...";
                     }
+
+                    // [강제 분할] 20초가 지났고 숨 가다듬는 중이면 자름
+                    if (chunkElapsed > MAX_CHUNK_DURATION && average < THRESHOLD + 8) {
+                        cutRecording();
+                    }
+
                     clearTimeout(silenceTimer);
                     silenceTimer = null;
                 } else {
                     if (isSpeaking && !silenceTimer) {
                         silenceTimer = setTimeout(() => {
                             isSpeaking = false;
-                            statusText.innerText = `상태: ${SILENCE_DURATION / 1000}초 정적 감지 (전송 중)`;
-                            if (mediaRecorder.state === "recording") mediaRecorder.stop();
+                            statusText.innerText = "상태: 다음 음성 대기 중...";
+                            cutRecording();
                         }, SILENCE_DURATION);
+                    } else if (!isSpeaking && chunkElapsed > IDLE_FLUSH_INTERVAL) {
+                        // 대기 중 5초마다 버퍼 비우기 (이중 버퍼링이므로 공백 없음)
+                        cutRecording();
                     }
                 }
             };
@@ -525,7 +584,6 @@
                 const decoder = new TextDecoder('utf-8');
                 let fullText = "";
 
-                // UI 요소 먼저 생성 (실시간 반영을 위해)
                 const container = document.createElement('div');
                 container.className = 'text-block';
                 container.style.padding = "0.75rem 1.25rem";
@@ -564,10 +622,10 @@
                             try {
                                 const data = JSON.parse(dataStr);
                                 if (data.text) {
-                                    fullText = data.text; // 누적 텍스트 반영
+                                    fullText = data.text;
                                     original.innerText = `Original: ${fullText}`;
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                 }
@@ -586,19 +644,16 @@
             const patL = patientLang.value === "other" ? patientLangOther.value : patientLang.value;
 
             try {
-                // 1) 발화 정보 판단 (의사/환자 파싱)
+                // 1) 발화 정보 판단 (의사/환자)
                 const roleTask = fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                     body: JSON.stringify({
                         model: LLM_MODEL,
                         messages: [
                             {
                                 role: "system",
-                                content: `Identify the speaker. Input is one sentence. 
-                                Doctor speaks ${docL}, Patient speaks ${patL}. 
-                                Determine who is speaking based on language or context.
-                                Respond JSON: {"role": "Doctor" or "Patient"}`
+                                content: `Identify speaker. Doctor speaks ${docL}, Patient speaks ${patL}. Respond JSON: {"role": "Doctor" or "Patient"}`
                             },
                             { role: "user", content: text }
                         ],
@@ -606,68 +661,82 @@
                     })
                 });
 
-                // 2) 언어 번역 (다른 상대방의 언어로)
+                // 2) 언어 번역 스트리밍
                 const transTask = fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                     body: JSON.stringify({
                         model: LLM_MODEL,
+                        stream: true,
                         messages: [
                             {
                                 role: "system",
-                                content: `Medical machine translator. 
-                                Translate input text between ${docL} and ${patL} (to the target other person's language). 
-                                Respond JSON: {"translation": "..."}`
+                                content: `Medical machine translator. Translate between ${docL} and ${patL}. Output ONLY translation.`
                             },
                             { role: "user", content: text }
-                        ],
-                        response_format: { type: "json_object" }
+                        ]
                     })
                 });
 
                 const [roleReply, transReply] = await Promise.all([roleTask, transTask]);
-                const [roleData, transData] = await Promise.all([roleReply.json(), transReply.json()]);
 
-                console.log("GPT Role Response:", roleData);
-                console.log("GPT Trans Response:", transData);
+                roleReply.json().then(data => {
+                    const roleJson = JSON.parse(data.choices[0].message.content);
+                    const role = roleJson.role;
+                    const roleBadge = document.createElement('div');
+                    roleBadge.style.display = "inline-block";
+                    roleBadge.style.padding = "2px 8px";
+                    roleBadge.style.borderRadius = "4px";
+                    roleBadge.style.fontSize = "0.7rem";
+                    roleBadge.style.fontWeight = "800";
+                    roleBadge.style.marginBottom = "0.5rem";
+                    roleBadge.style.textTransform = "uppercase";
 
-                const roleJson = JSON.parse(roleData.choices[0].message.content);
-                const transJson = JSON.parse(transData.choices[0].message.content);
+                    if (role === "Doctor") {
+                        roleBadge.innerText = `👨‍⚕️ ${docL} (의료진)`;
+                        roleBadge.style.background = "#dbeafe";
+                        roleBadge.style.color = "#1e40af";
+                        container.style.borderLeft = "6px solid var(--secondary)";
+                        container.style.marginRight = "12%";
+                        container.style.background = "#f0f7ff";
+                    } else {
+                        roleBadge.innerText = `🧑 ${patL} (환자)`;
+                        roleBadge.style.background = "#dcfce7";
+                        roleBadge.style.color = "#166534";
+                        container.style.borderLeft = "6px solid #22c55e";
+                        container.style.marginLeft = "12%";
+                        container.style.background = "#fafffa";
+                    }
+                    container.prepend(roleBadge);
+                });
 
-                const role = roleJson.role;
-                const resultText = transJson.translation;
+                targetElement.innerText = "";
+                const reader = transReply.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let fullTrans = "";
 
-                // UI 업데이트: 카드 스타일 및 라벨링
-                const roleBadge = document.createElement('div');
-                roleBadge.style.display = "inline-block";
-                roleBadge.style.padding = "2px 8px";
-                roleBadge.style.borderRadius = "4px";
-                roleBadge.style.fontSize = "0.7rem";
-                roleBadge.style.fontWeight = "800";
-                roleBadge.style.marginBottom = "0.5rem";
-                roleBadge.style.textTransform = "uppercase";
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                if (role === "Doctor") {
-                    roleBadge.innerText = `👨‍⚕️ ${docL} (의료진)`;
-                    roleBadge.style.background = "#dbeafe";
-                    roleBadge.style.color = "#1e40af";
-                    container.style.borderLeft = "6px solid var(--secondary)";
-                    container.style.marginRight = "12%"; // 오른쪽 여백 -> 왼쪽 배치
-                    container.style.marginLeft = "0";
-                    container.style.background = "#f0f7ff";
-                } else {
-                    roleBadge.innerText = `🧑 ${patL} (환자)`;
-                    roleBadge.style.background = "#dcfce7";
-                    roleBadge.style.color = "#166534";
-                    container.style.borderLeft = "6px solid #22c55e";
-                    container.style.marginLeft = "12%"; // 왼쪽 여백 -> 오른쪽 배치
-                    container.style.marginRight = "0";
-                    container.style.background = "#fafffa";
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split("\n");
+                    for (const line of lines) {
+                        if (line.trim().startsWith("data: ")) {
+                            const dataStr = line.replace("data: ", "").trim();
+                            if (dataStr === "[DONE]") break;
+                            try {
+                                const json = JSON.parse(dataStr);
+                                const content = json.choices[0].delta.content;
+                                if (content) {
+                                    fullTrans += content;
+                                    targetElement.innerText = fullTrans;
+                                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                }
+                            } catch (e) { }
+                        }
+                    }
                 }
-
-                container.prepend(roleBadge);
-                targetElement.innerText = resultText;
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             } catch (err) {
                 targetElement.innerText = "데이터 분석 오류";
             }
